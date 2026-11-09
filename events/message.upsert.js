@@ -5,20 +5,17 @@ const { exec } = require("node:child_process");
 const { serialize } = require("../lib/serialize");
 const { instagram, ttsave, instaDL, twitter } = require("../lib/downloader");
 const ai = require("../lib/ai");
+const shell = require("../lib/shell");
 
 const PREFIX = process.env.PREFIX || ".";
-const { OWNER_NUMBERS: OWNER_NUMBER } = require("../lib/config");
 const COOLDOWN = {
   DEFAULT: 1000,
   DOWNLOADER: 2000,
-  AI: 500,
   STICKER: 300,
 };
 const FEATURES = {
   AUTO_DOWNLOAD: process.env.AUTO_DOWNLOAD === "true",
   AUTO_READ: process.env.AUTO_READ === "true",
-  ALWAYS_ONLINE: process.env.ALWAYS_ONLINE === "true",
-  TYPING_INDICATOR: process.env.TYPING_INDICATOR === "true",
   ANTI_DELETE: process.env.ANTI_DELETE === "true",
   AUTO_REJECT_CALL: process.env.AUTO_REJECT_CALL === "true",
 };
@@ -45,7 +42,7 @@ setInterval(() => {
 const URL_REGEX = /https?:\/\/(?:[^\s]*\.)?(?:tiktok\.com|instagram\.com|(?:(?:vx|fx)?twitter|x)\.com)\/[^\s]+/i;
 
 async function handleAutoDownload(sock, m) {
-  if (!FEATURES.AUTO_DOWNLOAD || m.fromMe) return;
+  if (!FEATURES.AUTO_DOWNLOAD || !m.fromMe) return;
   const url = m.body?.match(URL_REGEX)?.[0];
   if (!url) return;
   const remaining = isOnCooldown(m.sender, "autodl", COOLDOWN.DOWNLOADER);
@@ -137,14 +134,6 @@ module.exports = {
           global.log?.warn(`Anti-delete error: ${antiDeleteErr.message}`);
         }
         const m = await serialize(sock, raw);
-        if (ai.isDm(m)) {
-          const origReply = m.reply;
-          m.reply = (content, ...rest) => {
-            if (typeof content === "string") ai.note(m.chat, "assistant", content);
-            return origReply(content, ...rest);
-          };
-          if (m.body) ai.note(m.chat, "user", m.body);
-        }
         if (m.isGroup && !m.fromMe && m.mtype !== "protocolMessage") {
           try { if (await db.isBungkam(m.chat, m.sender)) { await sock.sendMessage(m.chat, { delete: m.key }); continue; } } catch {}
         }
@@ -160,6 +149,7 @@ module.exports = {
         try {
           const { chat, sender, body } = m;
           if (!body) continue;
+            if (!m.fromMe) continue;
 
             const isChatBanned = await db.isChatBanned(chat);
             const banCmd = body.slice(PREFIX.length).trim().split(/\s+/)[0].toLowerCase();
@@ -173,10 +163,23 @@ module.exports = {
               }
             } catch (e) { }
             const senderNumber = sender.split("@")[0];
-            const isDev = (OWNER_NUMBER || []).includes(senderNumber) || m.fromMe;
-            const isRce = (OWNER_NUMBER || []).includes(senderNumber) || m.fromMe;
-            const isChatAllowed = false;
-            if ((body.startsWith(">>") || body.startsWith("$")) && !isRce) {
+            const isDev = m.fromMe;
+
+            if (m.fromMe && (body === "/new" || body === "/close")) {
+              await ai.handleControl(sock, m);
+              continue;
+            }
+
+            if (m.fromMe && shell.hasPending(m.chat) && ai.sessions.has(m.chat)) {
+              if (await ai.maybeReply(sock, m)) continue;
+            }
+
+            if (!m.fromMe && ai.sessions.has(m.chat)) {
+              await ai.maybeReply(sock, m);
+              continue;
+            }
+
+            if (body.startsWith("$") && !isDev) {
               global.log?.warn(`Blocked RCE attempt from ${senderNumber} (not in OWNER_NUMBER)`);
               continue;
             }
@@ -201,14 +204,12 @@ module.exports = {
             }
             await handleAutoDownload(sock, m);
             if (!body.startsWith(PREFIX)) {
-              if (m.isPrivate) ai.maybeReply(sock, m).catch(() => {});
               continue;
             }
             const rawBody = body.slice(PREFIX.length).trim();
             const args = rawBody.split(/\s+/);
             const cmd = args.shift().toLowerCase();
             if (!global.commands.has(cmd)) {
-              if (m.isPrivate) ai.maybeReply(sock, m).catch(() => {});
               continue;
             }
             const mod = global.commands.get(cmd);
@@ -223,7 +224,6 @@ module.exports = {
             await mod.run(sock, m, args, m.reply, chat);
           } catch (err) {
             global.log?.error(`Handler error: ${err.message}`);
-            if (m.isPrivate) ai.replyToError(sock, m, err).catch(() => {});
           }
         }
     });
