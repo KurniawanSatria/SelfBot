@@ -7,3 +7,5 @@ tmp/
 *.db-wal
 *.db-shm
 contacts.json
+package-lock.json
+bun.lock
