@@ -3,7 +3,7 @@ const db = require("../lib/database");
 
 function isOwner(m) {
 	const senderNumber = (m.sender || "").split("@")[0];
-	return AUTHORIZED_NUMBERS.includes(senderNumber) || m.fromMe;
+	return OWNER_NUMBERS.includes(senderNumber) || m.fromMe;
 }
 
 module.exports = {

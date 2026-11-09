@@ -17,8 +17,6 @@ const AUTH_DIR = process.env.AUTH_DIR || "./session";
 const FEATURES = {
 	AUTO_DOWNLOAD: process.env.AUTO_DOWNLOAD === "true",
 	AUTO_READ: process.env.AUTO_READ === "true",
-	ALWAYS_ONLINE: process.env.ALWAYS_ONLINE === "true",
-	TYPING_INDICATOR: process.env.TYPING_INDICATOR === "true",
 	ANTI_DELETE: process.env.ANTI_DELETE === "true",
 	AUTO_REJECT_CALL: process.env.AUTO_REJECT_CALL === "true",
 };

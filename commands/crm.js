@@ -1363,7 +1363,7 @@ function formatTimestamp(timestamp) {
 }
 
 function formatLastChat(rows) {
-	const lines = [`╭─〔 LAST CHAT • ${rows.length} PESAN 〕`, '│'];
+	const lines = [`╭─〔 LAST CHAT • ${rows.length} MESSAGES 〕`, '│'];
 
 	for (let i = 0; i < rows.length; i++) {
 		const row = rows[i];
