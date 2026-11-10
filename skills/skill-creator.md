@@ -35,7 +35,7 @@ Panggil `read_skill` memakai nama yang dituju. Kalau isinya balik, skill sudah a
 
 ### 3. Tulis draf
 
-Kamu tidak bisa menulis file sendiri. Serahkan isi file ke `run_shell` yang sudah disetujui pengguna, atau tampilkan isi lengkapnya lalu minta pengguna menyimpannya. Jangan mengarang hasil bahwa file sudah tersimpan sebelum ada bukti.
+Panggil tool `save_skill` dengan nama dan isi markdown lengkap. Tool yang sama dipakai untuk mengubah skill yang sudah ada. Jangan mengarang hasil bahwa file sudah tersimpan sebelum tool mengembalikan konfirmasi.
 
 Format file wajib:
 

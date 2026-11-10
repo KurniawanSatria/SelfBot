@@ -25,6 +25,9 @@ const { createSocket } = require("./lib/socket");
 const storeModule = require("./lib/store");
 const makeInMemoryStore = storeModule.makeInMemoryStore || storeModule.default?.makeInMemoryStore;
 const db = require("./lib/database");
+const memory = require("./lib/memory");
+const scheduler = require("./lib/scheduler");
+const ai = require("./lib/ai");
 const fs = require("fs");
 const path = require("path");
 const pino = require("pino");
@@ -251,6 +254,7 @@ const start = async () => {
 	try {
 		await db.init();
 		global.db = db.db;
+		for (const fact of memory.OWNER_FACTS) await memory.remember(memory.OWNER_KEY, fact);
 		global.log.success("Database initialized");
 
 		await db.loadAllChatsFromStore(sock.store);
@@ -274,6 +278,15 @@ const start = async () => {
 	}
 
 	await loadEvents(sock, { saveCreds, restartFn: start });
+	scheduler.start(sock, (sockArg, job) => ai.runScheduled(sockArg, {
+		fromMe: true,
+		body: job.text,
+		text: job.text,
+		chat: job.chat,
+		isPrivate: !job.chat.endsWith("@g.us"),
+		sender: String(sockArg?.user?.id || "").split(":")[0],
+		reply: async () => ({}),
+	}));
 	const processedCalls = new Set();
 	sock.ev.on("call", async (calls) => {
 		if (!FEATURES?.AUTO_REJECT_CALL) return;

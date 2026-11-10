@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node index.js",
-    "check": "node --check index.js && node --check events/message.upsert.js && node --check events/connection.update.js && node scripts/smoke.js"
+    "check": "node --check index.js && node --check events/message.upsert.js && node --check events/connection.update.js && node scripts/smoke.js",
+    "benchmark": "node scripts/benchmark.js"
   },
   "dependencies": {
     "@firecrawl/anydoc": "^0.2.4",

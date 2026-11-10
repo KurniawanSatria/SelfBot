@@ -128,6 +128,7 @@ module.exports = {
         if (!raw.message) continue;
         if (!raw.key?.id) continue;
         if (raw.key.id.startsWith("INO")) continue;
+        if (raw.key.id.startsWith(ai.AI_MSG_TAG)) continue;
         try {
           await handleAntiDelete(sock, raw);
         } catch (antiDeleteErr) {
@@ -148,36 +149,39 @@ module.exports = {
         }
         try {
           const { chat, sender, body } = m;
-          if (!body) continue;
-            if (!m.fromMe) continue;
+          if (!body && m.mtype !== "imageMessage" && m.mtype !== "audioMessage") continue;
+          const fromOwner = await ai.isOwnerInstructionAsync(m, sock);
 
-            const isChatBanned = await db.isChatBanned(chat);
-            const banCmd = body.slice(PREFIX.length).trim().split(/\s+/)[0].toLowerCase();
-            const isBanBypass = ["banchat", "unbanchat", "ban", "unban"].includes(banCmd);
-            if (isChatBanned && !isBanBypass) continue;
-            try {
-              const chatExists = await db.isChatAllowed(chat);
-              if (!chatExists && sock.store?.chats?.[chat]) {
-                const chatData = sock.store.chats[chat];
-                await db.addAllowedChat(chat, chatData.name || "", chat.endsWith("@g.us") ? "group" : "individual");
-              }
-            } catch (e) { }
-            const senderNumber = sender.split("@")[0];
-            const isDev = m.fromMe;
+          const isChatBanned = await db.isChatBanned(chat);
+          const banCmd = body.slice(PREFIX.length).trim().split(/\s+/)[0].toLowerCase();
+          const isBanBypass = ["banchat", "unbanchat", "ban", "unban"].includes(banCmd);
+          if (isChatBanned && !isBanBypass) continue;
 
-            if (m.fromMe && (body === "/new" || body === "/close")) {
-              await ai.handleControl(sock, m);
-              continue;
+          if (fromOwner && (body === "/new" || body === "/close")) {
+            await ai.handleControl(sock, m);
+            continue;
+          }
+
+          if (fromOwner && shell.hasPending(m.chat) && ai.sessions.has(m.chat)) {
+            if (await ai.maybeReply(sock, m)) continue;
+          }
+
+          if (ai.sessions.has(m.chat)) {
+            await ai.maybeReply(sock, m);
+            continue;
+          }
+
+          if (!fromOwner) continue;
+
+          try {
+            const chatExists = await db.isChatAllowed(chat);
+            if (!chatExists && sock.store?.chats?.[chat]) {
+              const chatData = sock.store.chats[chat];
+              await db.addAllowedChat(chat, chatData.name || "", chat.endsWith("@g.us") ? "group" : "individual");
             }
-
-            if (m.fromMe && shell.hasPending(m.chat) && ai.sessions.has(m.chat)) {
-              if (await ai.maybeReply(sock, m)) continue;
-            }
-
-            if (!m.fromMe && ai.sessions.has(m.chat)) {
-              await ai.maybeReply(sock, m);
-              continue;
-            }
+          } catch (e) { }
+          const senderNumber = sender.split("@")[0];
+          const isDev = m.fromMe;
 
             if (body.startsWith("$") && !isDev) {
               global.log?.warn(`Blocked RCE attempt from ${senderNumber} (not in OWNER_NUMBER)`);
